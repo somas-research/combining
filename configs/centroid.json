@@ -1,0 +1,29 @@
+{
+  "examples": true,
+  "wngc": true,
+  "method": "centroid",
+
+  "models": [
+    "../deberta-base_compiled_102M_mlm0.15_google-bert_bert-base-cased_l0_0_mlm0_reinit_1024_0.1_1e-4_TL-1/100000/",
+    "../deberta-base_compiled_102M_mlsm0.15_google-bert_bert-base-cased_l12_3072_mlm0_reinit_1024_0.1_1e-4_TL-1/100000/"
+  ],
+
+  "eval_datasets": [
+    "../wsd-hard-benchmark/wsd_hard_benchmark/softEN/softEN",
+    "../wsd-hard-benchmark/wsd_hard_benchmark/hardEN/hardEN",
+    "../wsd-hard-benchmark/wsd_hard_benchmark/42D/42D",
+    "../wsd-hard-benchmark/wsd_hard_benchmark/S10amended/S10amended",
+    "../wsd-hard-benchmark/wsd_hard_benchmark/ALLamended/ALLamended"
+  ],
+
+  "train_path": "../WSD_Evaluation_Framework/Training_Corpora/",
+
+  "layers": [-4, -3, -2, -1],
+
+  "run_name": "centroid_semcor_examples_wngt",
+
+  "iters": 500,
+  "batchsize": 400,
+  "lda": 0.05,
+  "K": 3000
+}

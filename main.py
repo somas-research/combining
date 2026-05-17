@@ -5,38 +5,72 @@ import numpy as np
 import centroid
 import pmi
 import os 
+import argparse
+import json
+from pathlib import Path
 
-config = {
-    "examples": True,
-    "wngc": True,
-    "method": "centroid",
-    "models":  [
-                "path/to/model1",
-                "path/to/model2"
-    ],
-    "eval_datasets": [
-                 "../wsd-hard-benchmark/wsd_hard_benchmark/softEN/softEN",
-                 #"../wsd-hard-benchmark/wsd_hard_benchmark/hardEN/hardEN",
-                 #"../wsd-hard-benchmark/wsd_hard_benchmark/42D/42D",
-                 #"../wsd-hard-benchmark/wsd_hard_benchmark/S10amended/S10amended",
-                 #"../wsd-hard-benchmark/wsd_hard_benchmark/ALLamended/ALLamended"
-                 ],
-    "train_path": "../WSD_Evaluation_Framework/Training_Corpora/",
-    "layers": [-4, -3, -2, -1],
-    "run_name": "wngc_ex",
-    "iters": 100,
-    "batchsize": 400,
-    "lda": 0.05,
-    "K": 3000
-}
 
-if __name__ == "__main__":
+def load_config(config_path: str) -> dict:
+    config_path = Path(config_path)
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    required_keys = [
+        "examples",
+        "wngc",
+        "method",
+        "models",
+        "eval_datasets",
+        "train_path",
+        "layers",
+        "run_name",
+        "iters",
+        "batchsize",
+        "lda",
+        "K",
+    ]
+
+    missing = [key for key in required_keys if key not in config]
+    if missing:
+        raise ValueError(f"Missing required config keys: {missing}")
+
+    if config["method"] not in {"centroid", "pmi"}:
+        raise ValueError(
+            f"Unsupported method: {config['method']}. "
+            "Expected one of: 'centroid', 'pmi'."
+        )
+
+    return config
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Run centroid or PMI WSD experiments from a config file."
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=True,
+        help="Path to JSON config file.",
+    )
+    return parser.parse_args()
+
+
+def main():
+
+    args = parse_args()
+    config = load_config(args.config)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     id_to_gold, _ = get_labels(config["train_path"] + 'SemCor/semcor.gold.key.txt')
     training_data, _ = get_data(config["train_path"] + 'SemCor/semcor.data.xml', id_to_gold)
 
-    training_data_wngc=None
+    training_data_wngc = None
     if config["wngc"]:
         id_to_gold_wngc, _ = get_labels(config["train_path"] + 'wngc/wngc.gold.key.txt')
         training_data_wngc, _ = get_data(config["train_path"] +'wngc/wngc.data.xml', id_to_gold_wngc)
@@ -48,7 +82,7 @@ if __name__ == "__main__":
         model = AutoModel.from_pretrained(model_path, output_hidden_states=True).to(device)
 
         if model_path.startswith("/data/"):
-            model_name = model_path.split("/")[-2]
+            model_name = model_path.split("/")[-3]
         else:
             model_name = model_path.split("/")[-1]
 
@@ -73,7 +107,7 @@ if __name__ == "__main__":
 
         wn_senses=None
         if(config["examples"]):
-            wn_emb, wn_senses = load_or_compute_wn(model_name, config["layers"])
+            wn_emb, wn_senses = load_or_compute_wn(model_name, config["layers"], model, tokenizer)
             sources.append(wn_emb)
         
 
@@ -81,7 +115,6 @@ if __name__ == "__main__":
             np.concatenate(items, axis=0)
             for items in zip(*sources)
         ])
-        print(combined_embeddings.shape)
 
         for eval_set in config["eval_datasets"]:
             setname = eval_set.split("/")[-1]
@@ -102,3 +135,7 @@ if __name__ == "__main__":
                     if not os.path.exists("./sparse_outputs/"):
                         os.mkdir("./sparse_outputs/")
                     pmi.evaluate_to_file(l_embeddings, l_eval_embeddings, config["K"], config["iters"], config["lda"], config["batchsize"], path=output_name, training_data=[training_data,training_data_wngc,wn_senses], id_to_gold=id_to_gold, test_data=test_data)
+
+if __name__ == "__main__":
+    main()
+    

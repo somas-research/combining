@@ -64,14 +64,14 @@ def load_or_compute_embeddings(
     prefix=""
 ):
     paths = [
-        f"/data/somas/repr/{model_name}{prefix}_{layer}.npy"
+        f"./repr/{model_name}{prefix}_{layer}.npy"
         for layer in layers
     ]
 
     if all(os.path.exists(p) for p in paths):
         emb = np.array([np.load(p) for p in paths])
     else:
-        emb = compute_fn(*compute_args)
+        emb = compute_fn(*compute_args, layers)
         for i, layer in enumerate(layers):
             np.save(paths[i], emb[i])
 
@@ -84,7 +84,6 @@ def get_sense_inventory():
     sense_inventory_v = {}
     sense_inventory_r = {}
 
-    # Map your POS labels to WordNet POS labels
     pos_map = {
         "n": wn.NOUN,
         "v": wn.VERB,
@@ -92,17 +91,13 @@ def get_sense_inventory():
         "r": wn.ADV
     }
 
-    # For each POS
     for pos, wn_pos in pos_map.items():
 
-        # Iterate all lemmas that exist in WordNet for that POS
         for lemma in wn.all_lemma_names(pos=wn_pos):
             lemma_l = lemma.lower()
 
-            # Get all WordNet sensekeys for lemma+pos
             sensekeys = [l.key() for l in wn.lemmas(lemma, wn_pos)]
 
-            # Store in correct POS dictionary
             if pos == "a":
                 sense_inventory_a[lemma_l] = sensekeys
             elif pos == "n":
@@ -119,7 +114,7 @@ def get_sense_inventory():
         sense_inventory_r
     )
 
-def get_wn_reprs():
+def get_wn_reprs(model, tokenizer, layers):
     res = []
     res_s = []
     all_sense_keys = []
@@ -179,19 +174,19 @@ def get_wn_reprs():
     return res_embeddings, res_s
 
 
-def load_or_compute_wn(model_name, layers):
+def load_or_compute_wn(model_name, layers, model, tokenizer):
     emb_paths = [
-        f"/data/somas/repr/{model_name}_wn_{layer}.npy"
+        f"./repr/{model_name}_wn_{layer}.npy"
         for layer in layers
     ]
-    senses_path = f"/data/somas/repr/{model_name}_wn_senses.pkl"
+    senses_path = f"./repr/{model_name}_wn_senses.pkl"
 
     if all(os.path.exists(p) for p in emb_paths) and os.path.exists(senses_path):
         wn_emb = np.array([np.load(p) for p in emb_paths])
         with open(senses_path, "rb") as f:
             wn_senses = pickle.load(f)
     else:
-        wn_emb, wn_senses = get_wn_reprs()
+        wn_emb, wn_senses = get_wn_reprs(model, tokenizer, layers)
         for i, layer in enumerate(layers):
             np.save(emb_paths[i], wn_emb[layer])
         with open(senses_path, "wb") as f:
@@ -208,9 +203,9 @@ def get_label_mappings(M, training_data, id_to_gold):
 
     for sentence in training_data[0]:  
         for token in sentence['words']:
-            vec = M[idx]  
-            if vec.sum() > 0:
-                vec /= vec.sum()
+            vec = M[idx]
+            #if vec.sum() > 0:
+            #    vec /= vec.sum()
             idx += 1
             senses = id_to_gold[token["id"]]
 
@@ -228,9 +223,9 @@ def get_label_mappings(M, training_data, id_to_gold):
     if training_data[1]:
         for sentence in training_data[1]:  
             for token in sentence['words']:
-                vec = M[idx]  
-                if vec.sum() > 0:
-                    vec /= vec.sum()
+                vec = M[idx]
+                #if vec.sum() > 0:
+                #    vec /= vec.sum()
                 idx += 1
                 senses = id_to_gold[token["id"]]
 
@@ -248,9 +243,9 @@ def get_label_mappings(M, training_data, id_to_gold):
     
     if training_data[2]:
         for sense in training_data[2]:  
-            vec = M[idx]  
-            if vec.sum() > 0:
-                vec /= vec.sum()
+            vec = M[idx].copy()
+            #if vec.sum() > 0:
+            #    vec /= vec.sum()
             idx += 1
 
             if sense not in labels_to_ids:
@@ -267,7 +262,7 @@ def get_label_mappings(M, training_data, id_to_gold):
 
     return labels_to_vecs, labels_to_ids, ids_to_labels, labels_to_freq
 
-def get_train_embeddings(model, tokenizer, training_data_p):
+def get_train_embeddings(model, tokenizer, training_data_p, layers):
     res = []
 
     print("processing train embeddings")
