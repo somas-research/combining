@@ -1,4 +1,4 @@
-# Combining MLSM with sparse contextualized word representations
+# Evaluating Latent Semantic Pre-training for Fine-grained Word Sense Disambiguation
 
 This repository contains the code accompanying the paper:
 
